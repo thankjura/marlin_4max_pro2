@@ -39,7 +39,7 @@
 #define CONFIGURATION_H
 #define CONFIGURATION_H_VERSION 010109
 
-#define MSG_MY_VERSION "V1.4.0-p1" //2021.10.13
+#define MSG_MY_VERSION "V1.4.1" //2021.10.15
 #define OutageTest  // Resuming printing
 #define TFTmodel
 
@@ -612,7 +612,7 @@
  * Override with M92
  *                                      X, Y, Z, E0 [, E1[, E2[, E3[, E4]]]]
  */
-#define DEFAULT_AXIS_STEPS_PER_UNIT    { 100.06,80.06,800,400 }
+#define DEFAULT_AXIS_STEPS_PER_UNIT    { 100.06,80.06,800,421 }
 
 /**
  * Default Max Feed Rate (mm/s)

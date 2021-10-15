@@ -910,7 +910,6 @@ void DoorKeyScan() {
             DoorKeyProcess(Door_onoff_status);
         }
      } else  if(!READ(DOOR_CHECK) && (door_status_older==1)) {
-        char value[30];
         counter=0;
         counter1++;
         if(counter1>=30) {
@@ -1669,7 +1668,7 @@ void mybeep(int beepP,int beepS) {
 
 void Endstopsbeep() {
   static char last_status=((READ(X_MIN_PIN)<<3)|(READ(Y_MIN_PIN)<<2)|(READ(Y_MAX_PIN)<<1)|READ(Z_MIN_PIN));
-  static unsigned char now_status,status_flag=false,counter=0;
+  static unsigned char now_status,counter=0;
   now_status=((READ(X_MIN_PIN)<<3)|(READ(Y_MIN_PIN)<<2)|(READ(Y_MAX_PIN)<<1)|READ(Z_MIN_PIN))&0xff;
   if(now_status<last_status) {
     counter++;
@@ -15749,12 +15748,13 @@ void disable_all_steppers() {
  *  - Check if an idle but hot extruder needs filament extruded (EXTRUDER_RUNOUT_PREVENT)
  */
 void manage_inactivity(const bool ignore_stepper_queue/*=false*/) {
-
   FilamentScan();
   static unsigned int temp=0;
   temp++;
   if(temp>=1000) {
-    temp=0;Fan2Scan();Light_CON();
+    temp=0;
+    Fan2Scan();
+    Light_CON();
   }
 
   #if ENABLED(FILAMENT_RUNOUT_SENSOR)

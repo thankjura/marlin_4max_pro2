@@ -74,14 +74,11 @@ inline void store_char(unsigned char c, ring_buffer *buffer)
   void serialEvent3() __attribute__((weak));
   void serialEvent3() {}
   #define serialEvent3_implemented
-  ISR(USART3_RX_vect)
-  {
+  ISR(USART3_RX_vect) {
     if (bit_is_clear(UCSR3A, UPE3)) {
       unsigned char c = UDR3;
       store_char(c, &rx_buffer_ajg);
-    } else {
-      unsigned char c = UDR3;
-    };
+    }
   }
 #endif
 
@@ -170,10 +167,8 @@ try_again:
   cbi(*_ucsrb, _udrie);
 }
 
-void MyHardwareSerial::begin(unsigned long baud, byte config)
-{
+void MyHardwareSerial::begin(unsigned long baud, byte config) {
   uint16_t baud_setting;
-  uint8_t current_config;
   bool use_u2x = true;
 
 #if F_CPU == 16000000UL
