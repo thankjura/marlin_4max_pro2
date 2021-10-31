@@ -1098,7 +1098,7 @@ void get_command_from_TFT() {
             while(TFTcmdbuffer[TFTbufindw][count] != '*') checksum = checksum^TFTcmdbuffer[TFTbufindw][count++];
             TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], '*');
 
-            if( (int)(strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)) != checksum) {
+            if((int)(strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)) != checksum) {
               NEW_SERIAL_ERROR_START;
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
@@ -1133,9 +1133,7 @@ void get_command_from_TFT() {
         }
         if((strchr(TFTcmdbuffer[TFTbufindw], 'A') != NULL)) {
           TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], 'A');
-          int code = (int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)));
-          SERIAL_ECHOLN(code);
-          switch(code) {
+          switch((int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)))) {
             case 0://A0 GET HOTEND TEMP
               NEW_SERIAL_PROTOCOLPGM("A0V ");
               NEW_SERIAL_PROTOCOL(itostr3(int(thermalManager.degHotend(0) + 0.5)));
