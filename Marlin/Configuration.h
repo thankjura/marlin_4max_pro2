@@ -39,7 +39,7 @@
 #define CONFIGURATION_H
 #define CONFIGURATION_H_VERSION 010109
 
-#define MSG_MY_VERSION "V1.5.0" //2021.10.29
+#define MSG_MY_VERSION "V1.5.1" //2021.11.01
 #define OutageTest  // Resuming printing
 #define TFTmodel
 
