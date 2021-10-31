@@ -1516,11 +1516,11 @@ void Planner::tick() {
         //enqueue_and_echo_commands_P(PSTR("G28 X0"));	
         enqueue_and_echo_commands_P(PSTR("M84"));	
         SERIAL_PROTOCOL("***** X = ") ;
-        SERIAL_PROTOCOL_F(stepper.position(0)*steps_to_mm[0], 2);
+        SERIAL_PROTOCOL_F(stepper.position((AxisEnum) 0)*steps_to_mm[0], 2);
         SERIAL_PROTOCOL("  Y = ") ;
-        SERIAL_PROTOCOL_F(stepper.position(1)*steps_to_mm[1], 2);
+        SERIAL_PROTOCOL_F(stepper.position((AxisEnum) 1)*steps_to_mm[1], 2);
         SERIAL_PROTOCOL("  Z = ") ;
-        SERIAL_PROTOCOL_F(stepper.position(2)*steps_to_mm[2], 2);
+        SERIAL_PROTOCOL_F(stepper.position((AxisEnum) 2)*steps_to_mm[2], 2);
         SERIAL_PROTOCOLLN(" ") ;
     }
     #endif

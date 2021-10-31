@@ -1103,10 +1103,10 @@ void get_command_from_TFT() {
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
               NEWFlushSerialRequestResend();
-              NEW_SERIAL_ERROR_START;
+              //NEW_SERIAL_ERROR_START;
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
-              NEWFlushSerialRequestResend();
+              //NEWFlushSerialRequestResend();
               serial3_count = 0;
               return;
             }
@@ -1133,7 +1133,9 @@ void get_command_from_TFT() {
         }
         if((strchr(TFTcmdbuffer[TFTbufindw], 'A') != NULL)) {
           TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], 'A');
-          switch((int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)))) {
+          int code = (int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)));
+          SERIAL_ECHOLN(code);
+          switch(code) {
             case 0://A0 GET HOTEND TEMP
               NEW_SERIAL_PROTOCOLPGM("A0V ");
               NEW_SERIAL_PROTOCOL(itostr3(int(thermalManager.degHotend(0) + 0.5)));
@@ -1339,8 +1341,8 @@ void get_command_from_TFT() {
               TFT_SERIAL_ENTER();
               break;
             case 19: // A19 CLOSED STEPER DIRV
-              if((!USBConnectFlag)&&(!card.sdprinting)) {
-                quickstop_stepper();
+              if(!USBConnectFlag && !card.sdprinting) {
+                // quickstop_stepper(); // fix STOP button
                 disable_X();
                 disable_Y();
                 disable_Z();
