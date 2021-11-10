@@ -49,8 +49,6 @@
 
 extern char errorFlag;
 
-#define Door_ON_OFF_CHECK
-
 #define NEW_SERIAL_PROTOCOL(x) (NewSerial.print(x))
 #define NEW_SERIAL_PROTOCOL_F(x,y) (NewSerial.print(x,y))
 #define NEW_SERIAL_PROTOCOLPGM(x) (NewSerialprintPGM(PSTR(x)))
@@ -593,11 +591,6 @@ extern uint8_t active_extruder;
 
 #if ENABLED(MIXING_EXTRUDER)
   extern float mixing_factor[MIXING_STEPPERS];
-#endif
-
-#ifdef Door_ON_OFF_CHECK
-  extern bool Door_onoff_flag;
-  extern char Door_onoff_status;
 #endif
 
 inline void set_current_from_destination() { COPY(current_position, destination); }

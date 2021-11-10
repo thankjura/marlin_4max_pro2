@@ -344,13 +344,15 @@ void CardReader::openAndPrintFile(const char *name) {
 
 void CardReader::startFileprint() {
   if (cardOK) {
+    SERIAL_ECHOLN("cardOk");
     sdprinting = true;
     #if SD_RESORT
       flush_presort();
     #endif
     if(TFTresumingflag) {
-      enqueue_and_echo_commands_P(PSTR("G1 Z-20"));
-      enqueue_and_echo_commands_P(PSTR("G90"));
+      SERIAL_ECHOLN("TFTresumingflag is true");
+      //enqueue_and_echo_commands_P(PSTR("G1 Z-20"));
+      //enqueue_and_echo_commands_P(PSTR("G90"));
       TFTresumingflag=false;
     }
   }
@@ -385,7 +387,10 @@ void CardReader::TFTStopPringing() {
   TFTresumingflag=false;
   sdcardstartprintingflag=false;
   closefile();
-  quickstop_stepper();
+  // quickstop_stepper();
+  //clear_command_queue();
+  // enqueue_and_echo_commands_P(PSTR("M410"));
+  
   NEW_SERIAL_PROTOCOLPGM("J16");//STOP
   TFT_SERIAL_ENTER();
   //  autotempShutdown();

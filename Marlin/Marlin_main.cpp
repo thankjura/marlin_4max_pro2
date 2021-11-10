@@ -286,11 +286,6 @@ float Current_z_offset;
 uint16_t filenumber;
 bool USBConnectFlag=0;
 bool TestLineFlag = false;
-#ifdef Door_ON_OFF_CHECK
-  bool Door_onoff_flag=false;
-  char Door_onoff_status=0;
-  char door_status_older = 0;
-#endif
 void get_command_from_TFT();
 bool ReadMyfileNrFlag=true;
 extern uint16_t MyFileNrCnt;
@@ -316,7 +311,6 @@ unsigned char ResumingFlag=0;
 
 bool powerOFFflag=0;
 void PowerDown();
-void DoorKeyScan();
 
 static bool LightConFlag=true;
 
@@ -861,91 +855,28 @@ void setup_OutageTestPin() {
 
 #define FilamentTestPin 33
 void SetupFilament() {
-    pinMode(DOOR_CHECK,INPUT_PULLUP);
     pinMode(FilamentTestPin,INPUT);
     WRITE(FilamentTestPin,HIGH);
      _delay_ms(50);
 }
 
-void DoorKeyProcess(char result) {
-    static char FunSelfProcess = 0;
-    if(result==1) {
-        if(card.sdprinting) {
-            TFTpausingFlag=true;
-            card.pauseSDPrint();
-            NEW_SERIAL_PROTOCOLPGM("J05");
-            TFT_SERIAL_ENTER();
-            FunSelfProcess=1;
-        }
-    } else if(FunSelfProcess==1) {
-        if(TFTresumingflag) {
-            if(!TFTpausingFlag) {
-                card.startFileprint();
-                NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
-                TFT_SERIAL_ENTER();
-                FunSelfProcess=0;
-            }
-        }
-    }
-}
-
-void DoorKeyScan() {
-    static unsigned int counter=0;
-    static unsigned int counter1=0;
-
-    if(READ(DOOR_CHECK)&&(door_status_older==0)) {
-        counter1=0;
-        counter++;
-        if(counter>=30) {
-            counter = 0;
-            door_status_older = 1;
-            Door_onoff_status = 1;
-            NEW_SERIAL_PROTOCOLPGM("J40 ");
-            TFT_SERIAL_ENTER();
-            DoorKeyProcess(Door_onoff_status);
-        }
-     } else  if(!READ(DOOR_CHECK) && (door_status_older==1)) {
-        counter=0;
-        counter1++;
-        if(counter1>=30) {
-            counter1=0;
-            door_status_older=0;
-            Door_onoff_status = 0;
-            NEW_SERIAL_PROTOCOLPGM("J41 ");
-            TFT_SERIAL_ENTER();
-            DoorKeyProcess(Door_onoff_status);
-        }
-    }
-
-}
-
 void FilamentScan() {
     static char last_status=READ(FilamentTestPin);
     static unsigned char now_status,status_flag=false;
-    static unsigned int counter=0,doorcnt=0;
+    static unsigned int counter=0;
     now_status=READ(FilamentTestPin)&0xff;
-    #if ENABLED(Door_ON_OFF_CHECK)
-    if(Door_onoff_flag&&(!TFTpausingFlag)) {
-        doorcnt++;
-        if(doorcnt>1000)
-        {
-            doorcnt = 0;
-            DoorKeyScan();
-        }
-    }
-    #endif
     // if (now_status==last_status) return;
     if(now_status>last_status) {
         counter++;
         if(counter>=50000) {
             counter=0;
-            if((card.sdprinting==true)) {
+            if(IS_SD_PRINTING()) {
                 NEW_SERIAL_PROTOCOLPGM("J23");//j23 FILAMENT LACK with the prompt box don't disappear
                 TFT_SERIAL_ENTER();
                 TFTpausingFlag=true;
                 status_flag = true;
                 card.pauseSDPrint();
-            } else if((card.sdprinting==false)) {
+            } else if(!IS_SD_PRINTING()) {
                 NEW_SERIAL_PROTOCOLPGM("J15");//j15 FILAMENT LACK
                 TFT_SERIAL_ENTER();
             }
@@ -956,8 +887,7 @@ void FilamentScan() {
         counter=0;
         if(status_flag) {
             status_flag = false;
-            if((card.sdprinting==false))
-            {
+            if(!IS_SD_PRINTING()) {
                 NEW_SERIAL_PROTOCOLPGM("J05");//j15 FILAMENT LACK
                 TFT_SERIAL_ENTER();
             }
@@ -1103,10 +1033,11 @@ void get_command_from_TFT() {
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
               NEWFlushSerialRequestResend();
-              //NEW_SERIAL_ERROR_START;
+
+              NEW_SERIAL_ERROR_START;
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
-              //NEWFlushSerialRequestResend();
+              NEWFlushSerialRequestResend();
               serial3_count = 0;
               return;
             }
@@ -1133,6 +1064,7 @@ void get_command_from_TFT() {
         }
         if((strchr(TFTcmdbuffer[TFTbufindw], 'A') != NULL)) {
           TFTstrchr_pointer = strchr(TFTcmdbuffer[TFTbufindw], 'A');
+
           switch((int)((strtod(&TFTcmdbuffer[TFTbufindw][TFTstrchr_pointer - TFTcmdbuffer[TFTbufindw] + 1], NULL)))) {
             case 0://A0 GET HOTEND TEMP
               NEW_SERIAL_PROTOCOLPGM("A0V ");
@@ -1178,14 +1110,17 @@ void get_command_from_TFT() {
               TFT_SERIAL_ENTER();
               break;
             case 6: //A6 GET SD CARD PRINTING STATUS
-              if(card.sdprinting) {
+              if(IS_SD_PRINTING()) {
+                SERIAL_ECHOLN("status printing");
                 NEW_SERIAL_PROTOCOLPGM("A6V ");
                 TFTStatusFlag=1;
                 //  card.getStatus();
                 card.TFTgetStatus();
               } else if(TFTresumingflag) {
+                SERIAL_ECHOLN("status resuming");
                 NEW_SERIAL_PROTOCOL(itostr3(card.pause_sdpos_temp));
               } else  {
+                SERIAL_ECHOLN("status other");
                 NEW_SERIAL_PROTOCOLPGM("A6V ---");
               }
               TFT_SERIAL_ENTER();
@@ -1227,30 +1162,33 @@ void get_command_from_TFT() {
               }
               break;
             case 9: // a9 pasue sd
-              if(card.sdprinting) {
+              if(IS_SD_PRINTING()) {
                 TFTpausingFlag=true;
-                card.pauseSDPrint();
+                //card.pauseSDPrint();
+                enqueue_and_echo_commands_P(PSTR("M25"));
                 NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
-                TFT_SERIAL_ENTER();
+                TFT_SERIAL_ENTER();                
               }
               break;
             case 10:// A10 resume sd print
-              #if ENABLED(Door_ON_OFF_CHECK)
-                if(!Door_onoff_flag||(Door_onoff_flag&&(Door_onoff_status==0)))
-              #endif
-              if(TFTresumingflag) {
-                card.startFileprint();
-                NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
-                TFT_SERIAL_ENTER();
+              if(TFTresumingflag) {   
+                enqueue_and_echo_commands_P(PSTR("M24"));
+                
+                //card.startFileprint();
+                
+                //NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
+                //TFT_SERIAL_ENTER();                
               }
+              SERIAL_ECHOLN("A10 DONE");
               break;
             case 11://A11 STOP SD PRINT
-              if((card.sdprinting)||TFTresumingflag) {
-                clear_command_queue() ;
+              if(IS_SD_PRINTING()||TFTresumingflag) {                
                 FlagResumFromOutage=0;//must clean the flag.
                 card.TFTStopPringing();
                 thermalManager.setTargetHotend(0,0); //2019.4.17
                 thermalManager.setTargetBed(0);
+                enqueue_and_echo_commands_P(PSTR("G28 X Y"));                
+                enqueue_and_echo_commands_P(PSTR("G1 Z210"));
               }
               break;
             case 12: //a12 kill
@@ -1260,7 +1198,7 @@ void get_command_from_TFT() {
               break;
             case 13: //A13 SELECTION FILE
               //if((!USBConnectFlag)&&(!card.sdprinting))
-              if((!planner.movesplanned())&&(!TFTresumingflag)) {
+              if(!planner.movesplanned() &&(!TFTresumingflag)) {
                 starpos = (strchr(TFTstrchr_pointer + 4,'*'));
                 if(starpos!=NULL)
                   *(starpos-1)='\0';
@@ -1272,10 +1210,6 @@ void get_command_from_TFT() {
             case 14: //A14 START PRINTING
               // if((!USBConnectFlag)&&(!card.sdprinting))
 						  if(errorFlag!=0 && errorFlag!=7) break;
-
-						  #if ENABLED(Door_ON_OFF_CHECK)
-                if(!Door_onoff_flag||(Door_onoff_flag&&(Door_onoff_status==0)))
-              #endif
               if((!planner.movesplanned())&&(!TFTresumingflag)) {
                 errorFlag=0;
                 powerOFFflag=0;
@@ -1287,9 +1221,6 @@ void get_command_from_TFT() {
               break;
             case 15://A15 RESUMING FROM OUTAGE
                 // if((!USBConnectFlag)&&(!card.sdprinting))
-              #if ENABLED(Door_ON_OFF_CHECK)
-                if(!Door_onoff_flag||(Door_onoff_flag&&(Door_onoff_status==0)))
-              #endif
               if((!planner.movesplanned())&&(!TFTresumingflag)){
                 if(card.cardOK)
                 FlagResumFromOutage=true;
@@ -1339,8 +1270,10 @@ void get_command_from_TFT() {
               TFT_SERIAL_ENTER();
               break;
             case 19: // A19 CLOSED STEPER DIRV
-              if(!USBConnectFlag && !card.sdprinting) {
+              if(!USBConnectFlag && !IS_SD_PRINTING()) {
+                // enqueue_and_echo_commands_P(PSTR("M410"));
                 // quickstop_stepper(); // fix STOP button
+                //clear_command_queue();
                 disable_X();
                 disable_Y();
                 disable_Z();
@@ -1429,7 +1362,7 @@ void get_command_from_TFT() {
               TFT_SERIAL_ENTER();
               break;
             case 23: //a23 prheat pla
-              if((!planner.movesplanned())&&(!TFTresumingflag)) {
+              if(!planner.movesplanned() && !TFTresumingflag) {
                 //    if((READ(Z_TEST)==0)) enqueue_and_echo_commands_P(PSTR("G1 Z10")); //RASE Z AXIS
                 thermalManager.setTargetBed(60);
                 thermalManager.setTargetHotend(205, 0);
@@ -1440,7 +1373,7 @@ void get_command_from_TFT() {
               }
               break;
             case 24://a24 prheat abs
-              if((!planner.movesplanned())&&(!TFTresumingflag)) {
+              if(!planner.movesplanned() && !TFTresumingflag) {
                 //      if((READ(Z_TEST)==0)) enqueue_and_echo_commands_P(PSTR("G1 Z10")); //RASE Z AXIS
                 thermalManager.setTargetBed(80);
                 thermalManager.setTargetHotend(240, 0);
@@ -1460,7 +1393,10 @@ void get_command_from_TFT() {
               break;
             case 26://a26 refresh
               card.initsd();
-              if(!IS_SD_INSERTED()){ NEW_SERIAL_PROTOCOLPGM("J02");TFT_SERIAL_ENTER();}
+              if(!IS_SD_INSERTED()) {
+                NEW_SERIAL_PROTOCOLPGM("J02");
+                TFT_SERIAL_ENTER();
+              }
               //       else enqueue_and_echo_commands_P(PSTR("M20"));
               //        TFT_SERIAL_ENTER();
               break;
@@ -1612,21 +1548,7 @@ void get_command_from_TFT() {
               //myi2c.resetbuf();
               //sprintf(myi2c.I2C_SRBUF,"A100");
               //myi2c.TestMyI2C_(i2c,myi2c.addr,10,false);
-              break;
-            case 50://door check on /off
-              if(TFTcode_seen('O')){Door_onoff_flag=true;break;}
-              else if(TFTcode_seen('C')){Door_onoff_flag=false;Door_onoff_status=0;door_status_older = 0;break;}
-              if(TFTcode_seen('S')) {
-                if(Door_onoff_flag) {
-                  NEW_SERIAL_PROTOCOLPGM("J39 ");
-                  TFT_SERIAL_ENTER();
-                } else {
-                  //didn't open print done and auto power off
-                  NEW_SERIAL_PROTOCOLPGM("J38 ");
-                  TFT_SERIAL_ENTER();
-                }
-              }
-              break;
+              break;            
             case 81:    //A81
               memset(temstr,0,50);
               sprintf(temstr, "A81V %s\r\n",longfilePrintting);
@@ -1718,16 +1640,6 @@ void TFT_Commond_Scan() {
 
 void setupSDCARD() {
   card.initsd();
-}
-
-bool pauseCMDsendflag=false;
-void pauseCMDsend() {
-static char temp=0;
-  if(commands_in_queue < BUFSIZE) {
-    temp++;
-    if(temp==1)enqueue_and_echo_commands_P(PSTR("G91"));
-    if(temp==2){enqueue_and_echo_commands_P(PSTR("G1 Z+20")); pauseCMDsendflag=false;temp=0;}
-  }
 }
 
 #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -8179,8 +8091,11 @@ inline void gcode_M17() {
 
     if (!ensure_safe_temperature(mode)) {
       #if ENABLED(ULTIPANEL)
-        if (show_lcd) // Show status screen
+        if (show_lcd) { // Show status screen
+          SERIAL_ECHOLN("Show status screen 2");
           lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_STATUS);
+          SERIAL_ECHOLN("Show status screen 2 done");
+        }
       #endif
 
       return false;
@@ -8188,37 +8103,55 @@ inline void gcode_M17() {
 
     if (pause_for_user) {
       #if ENABLED(ULTIPANEL)
-        if (show_lcd) // Show "insert filament"
+        if (show_lcd) { // Show "insert filament"
+          SERIAL_ECHOLN("Show insert filament");
           lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_INSERT, mode);
+          SERIAL_ECHOLN("Show insert filament done");
+        }
       #endif
       SERIAL_ECHO_START();
       SERIAL_ECHOLNPGM(MSG_FILAMENT_CHANGE_INSERT);
+      SERIAL_ECHOLN("MSG_FILAMENT_CHANGE_INSERT");
 
       #if HAS_BUZZER
+        SERIAL_ECHOLN("beep");
         filament_change_beep(max_beep_count, true);
       #else
         UNUSED(max_beep_count);
       #endif
 
+      SERIAL_ECHOLN("keepalive");
       KEEPALIVE_STATE(PAUSED_FOR_USER);
+      SERIAL_ECHOLN("keepalive done");
       wait_for_user = true;    // LCD click or M108 will clear this
       while (wait_for_user) {
+        SERIAL_ECHOLN("wait for user o M108");
         #if HAS_BUZZER
+          SERIAL_ECHOLN("beep 2 start");
           filament_change_beep(max_beep_count);
+          SERIAL_ECHOLN("beep 2 done");
         #endif
         idle(true);
+        SERIAL_ECHOLN("wait for user o M108 ....");
       }
-      KEEPALIVE_STATE(IN_HANDLER);
+
+      SERIAL_ECHOLN("wait for user done");
+      KEEPALIVE_STATE(IN_HANDLER);      
+      SERIAL_ECHOLN("INHANDLER");
     }
 
     #if ENABLED(ULTIPANEL)
-      if (show_lcd) // Show "wait for load" message
+      if (show_lcd) { // Show "wait for load" message
+      SERIAL_ECHOLN("wait for load msg");
         lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_LOAD, mode);
+      }
     #endif
 
+    SERIAL_ECHOLN("slow load");
     // Slow Load filament
     if (slow_load_length) do_pause_e_move(slow_load_length, FILAMENT_CHANGE_SLOW_LOAD_FEEDRATE);
 
+    SERIAL_ECHOLN("fast load");
     // Fast Load Filament
     if (fast_load_length) {
       #if FILAMENT_CHANGE_FAST_LOAD_ACCEL > 0
@@ -8246,13 +8179,16 @@ inline void gcode_M17() {
       wait_for_user = false;
 
     #else
-
+      SERIAL_ECHOLN("sdssssssssssss");
       do {
         if (purge_length > 0) {
           // "Wait for filament purge"
           #if ENABLED(ULTIPANEL)
-            if (show_lcd)
+            if (show_lcd) {
+              SERIAL_ECHOLN("pause adv");
               lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_PURGE, mode);
+              SERIAL_ECHOLN("pause adv done");
+            }
           #endif
 
           // Extrude filament to get into hotend
@@ -8262,11 +8198,14 @@ inline void gcode_M17() {
         // Show "Purge More" / "Resume" menu and wait for reply
         #if ENABLED(ULTIPANEL)
           if (show_lcd) {
+            SERIAL_ECHOLN("pause for user");
             KEEPALIVE_STATE(PAUSED_FOR_USER);
             wait_for_user = false;
             lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_OPTION, mode);
+            SERIAL_ECHOLN("pause for user ...");
             while (advanced_pause_menu_response == ADVANCED_PAUSE_RESPONSE_WAIT_FOR) idle(true);
             KEEPALIVE_STATE(IN_HANDLER);
+            SERIAL_ECHOLN("pause for user done");
           }
         #endif
 
@@ -8357,7 +8296,11 @@ inline void gcode_M17() {
    * Returns 'true' if pause was completed, 'false' for abort
    */
   static bool pause_print(const float &retract, const point_t &park_point, const float &unload_length=0, const bool show_lcd=false) {
-    if (did_pause_print) return false; // already paused
+    SERIAL_ECHOLN("start pause");
+    if (did_pause_print) {
+      SERIAL_ECHOLN("already paused");
+      return false; // already paused
+    }
 
     #ifdef ACTION_ON_PAUSE
       SERIAL_ECHOLNPGM("//action:" ACTION_ON_PAUSE);
@@ -8372,6 +8315,8 @@ inline void gcode_M17() {
           lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_STATUS);
         LCD_MESSAGEPGM(MSG_M600_TOO_COLD);
       #endif
+
+      SERIAL_ECHOLN("return false");
 
       return false; // unable to reach safe temperature
     }
@@ -8389,6 +8334,8 @@ inline void gcode_M17() {
     print_job_timer.pause();
 
     // Save current position
+    SERIAL_ECHO("save position");
+
     COPY(resume_position, current_position);
 
     // Wait for synchronize steppers
@@ -8525,17 +8472,25 @@ inline void gcode_M17() {
 
     // Re-enable the heaters if they timed out
     bool nozzle_timed_out = false;
+
+    SERIAL_ECHOLN("Wait hotend loop");
+
     HOTEND_LOOP() {
       nozzle_timed_out |= thermalManager.is_heater_idle(e);
       thermalManager.reset_heater_idle_timer(e);
     }
 
+    SERIAL_ECHOLN("Wait hotend donw");
+
     if (nozzle_timed_out || thermalManager.hotEnoughToExtrude(active_extruder)) {
       // Load the new filament
-      load_filament(slow_load_length, fast_load_length, purge_length, max_beep_count, true, nozzle_timed_out);
+      // load_filament(slow_load_length, fast_load_length, purge_length, max_beep_count, false, nozzle_timed_out);
     }
 
+    SERIAL_ECHOLN("Wait for print to resume...");
+
     #if ENABLED(ULTIPANEL)
+      SERIAL_ECHOLN("Wait for print to resume");
       // "Wait for print to resume"
       lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_RESUME);
     #endif
@@ -8547,17 +8502,24 @@ inline void gcode_M17() {
         do_pause_e_move(-fwretract.retract_length, fwretract.retract_feedrate_mm_s);
     #endif
 
+    SERIAL_ECHOLN("If resume_position is negative");
+
     // If resume_position is negative
     if (resume_position[E_CART] < 0) do_pause_e_move(resume_position[E_CART], PAUSE_PARK_RETRACT_FEEDRATE);
 
+    SERIAL_ECHOLN("Move XY to starting position, then Z");
     // Move XY to starting position, then Z
     do_blocking_move_to_xy(resume_position[X_AXIS], resume_position[Y_AXIS], NOZZLE_PARK_XY_FEEDRATE);
 
+    SERIAL_ECHOLN("Set Z_AXIS to saved position ");
+    SERIAL_ECHOPAIR("Set Z_AXIS to saved position ", resume_position[Z_AXIS]);
     // Set Z_AXIS to saved position
     do_blocking_move_to_z(resume_position[Z_AXIS], NOZZLE_PARK_Z_FEEDRATE);
 
     // Now all extrusion positions are resumed and ready to be confirmed
     // Set extruder to saved position
+
+    SERIAL_ECHOLN("set_e_position_mm");
     planner.set_e_position_mm((destination[E_CART] = current_position[E_CART] = resume_position[E_CART]));
 
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
@@ -8566,6 +8528,7 @@ inline void gcode_M17() {
 
     #if ENABLED(ULTIPANEL)
       // Show status screen
+      SERIAL_ECHOLN("Show status screen");
       lcd_advanced_pause_show_message(ADVANCED_PAUSE_MESSAGE_STATUS);
     #endif
 
@@ -8575,9 +8538,13 @@ inline void gcode_M17() {
 
     --did_pause_print;
 
+    SERIAL_ECHOLN("start file print...");
+
     #if ENABLED(SDSUPPORT)
       if (did_pause_print) {
+        SERIAL_ECHOLN("start file print");
         card.startFileprint();
+        SERIAL_ECHOLN("start file print done");
         --did_pause_print;
       }
     #endif
@@ -8632,6 +8599,9 @@ inline void gcode_M17() {
 
     card.startFileprint();
 
+    NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
+    TFT_SERIAL_ENTER();
+
     #if ENABLED(POWER_LOSS_RECOVERY)
       if (parser.seenval('T'))
         print_job_timer.resume(parser.value_long());
@@ -8644,12 +8614,17 @@ inline void gcode_M17() {
    * M25: Pause SD Print
    */
   inline void gcode_M25() {
+    TFTpausingFlag=true;  
+
     card.pauseSDPrint();
     print_job_timer.pause();
 
     #if ENABLED(PARK_HEAD_ON_PAUSE)
       enqueue_and_echo_commands_P(PSTR("M125")); // Must be enqueued with pauseSDPrint set to be last in the buffer
     #endif
+
+    NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
+    TFT_SERIAL_ENTER();    
   }
 
   /**
@@ -10560,7 +10535,7 @@ inline void gcode_M121() { endstops.enable_globally(false); }
    *    Z = override Z raise
    */
   inline void gcode_M125() {
-
+    SERIAL_ECHOLN("start m125");
     // Initial retract before move to filament change position
     const float retract = -ABS(parser.seen('L') ? parser.value_axis_units(E_AXIS) : 0
       #ifdef PAUSE_PARK_RETRACT_LENGTH
@@ -10585,6 +10560,8 @@ inline void gcode_M121() { endstops.enable_globally(false); }
     #if DISABLED(SDSUPPORT)
       const bool job_running = print_job_timer.isRunning();
     #endif
+
+    SERIAL_ECHO("start pause print command");
 
     if (pause_print(retract, park_point)) {
       #if DISABLED(SDSUPPORT)
@@ -16583,8 +16560,6 @@ void setup() {
  *  - Call LCD update
  */
 void loop() {
-  if(pauseCMDsendflag) pauseCMDsend();
-
   #if ENABLED(SDSUPPORT)
 
     card.checkautostart();
@@ -16670,8 +16645,9 @@ void loop() {
         //when pause sd printing,send "ok"to tft as read buffer carry out
         planner.synchronize();
         TFTpausingFlag=false;
-        NEW_SERIAL_PROTOCOLPGM("J18");// pausing done
+        NEW_SERIAL_PROTOCOLPGM("J18");// pausing done        
         TFT_SERIAL_ENTER();
+        SERIAL_ECHOLN("J18 pausing done");
     }
   #endif
 }
