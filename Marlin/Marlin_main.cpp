@@ -285,12 +285,6 @@ float Current_z_offset;
 //char AutoLevelLowSpeedModelFlag=0;
 uint16_t filenumber;
 bool USBConnectFlag=0;
-bool TestLineFlag = false;
-#ifdef Door_ON_OFF_CHECK
-  bool Door_onoff_flag=false;
-  char Door_onoff_status=0;
-  char door_status_older = 0;
-#endif
 void get_command_from_TFT();
 bool ReadMyfileNrFlag=true;
 extern uint16_t MyFileNrCnt;
@@ -316,7 +310,6 @@ unsigned char ResumingFlag=0;
 
 bool powerOFFflag=0;
 void PowerDown();
-void DoorKeyScan();
 
 static bool LightConFlag=true;
 
@@ -861,91 +854,28 @@ void setup_OutageTestPin() {
 
 #define FilamentTestPin 33
 void SetupFilament() {
-    pinMode(DOOR_CHECK,INPUT_PULLUP);
     pinMode(FilamentTestPin,INPUT);
     WRITE(FilamentTestPin,HIGH);
      _delay_ms(50);
 }
 
-void DoorKeyProcess(char result) {
-    static char FunSelfProcess = 0;
-    if(result==1) {
-        if(card.sdprinting) {
-            TFTpausingFlag=true;
-            card.pauseSDPrint();
-            NEW_SERIAL_PROTOCOLPGM("J05");
-            TFT_SERIAL_ENTER();
-            FunSelfProcess=1;
-        }
-    } else if(FunSelfProcess==1) {
-        if(TFTresumingflag) {
-            if(!TFTpausingFlag) {
-                card.startFileprint();
-                NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
-                TFT_SERIAL_ENTER();
-                FunSelfProcess=0;
-            }
-        }
-    }
-}
-
-void DoorKeyScan() {
-    static unsigned int counter=0;
-    static unsigned int counter1=0;
-
-    if(READ(DOOR_CHECK)&&(door_status_older==0)) {
-        counter1=0;
-        counter++;
-        if(counter>=30) {
-            counter = 0;
-            door_status_older = 1;
-            Door_onoff_status = 1;
-            NEW_SERIAL_PROTOCOLPGM("J40 ");
-            TFT_SERIAL_ENTER();
-            DoorKeyProcess(Door_onoff_status);
-        }
-     } else  if(!READ(DOOR_CHECK) && (door_status_older==1)) {
-        counter=0;
-        counter1++;
-        if(counter1>=30) {
-            counter1=0;
-            door_status_older=0;
-            Door_onoff_status = 0;
-            NEW_SERIAL_PROTOCOLPGM("J41 ");
-            TFT_SERIAL_ENTER();
-            DoorKeyProcess(Door_onoff_status);
-        }
-    }
-
-}
-
 void FilamentScan() {
     static char last_status=READ(FilamentTestPin);
     static unsigned char now_status,status_flag=false;
-    static unsigned int counter=0,doorcnt=0;
+    static unsigned int counter=0;
     now_status=READ(FilamentTestPin)&0xff;
-    #if ENABLED(Door_ON_OFF_CHECK)
-    if(Door_onoff_flag&&(!TFTpausingFlag)) {
-        doorcnt++;
-        if(doorcnt>1000)
-        {
-            doorcnt = 0;
-            DoorKeyScan();
-        }
-    }
-    #endif
     // if (now_status==last_status) return;
     if(now_status>last_status) {
         counter++;
         if(counter>=50000) {
             counter=0;
-            if((card.sdprinting==true)) {
+            if(IS_SD_PRINTING()) {
                 NEW_SERIAL_PROTOCOLPGM("J23");//j23 FILAMENT LACK with the prompt box don't disappear
                 TFT_SERIAL_ENTER();
                 TFTpausingFlag=true;
                 status_flag = true;
                 card.pauseSDPrint();
-            } else if((card.sdprinting==false)) {
+            } else if(!IS_SD_PRINTING()) {
                 NEW_SERIAL_PROTOCOLPGM("J15");//j15 FILAMENT LACK
                 TFT_SERIAL_ENTER();
             }
@@ -956,8 +886,7 @@ void FilamentScan() {
         counter=0;
         if(status_flag) {
             status_flag = false;
-            if((card.sdprinting==false))
-            {
+            if(!IS_SD_PRINTING()) {
                 NEW_SERIAL_PROTOCOLPGM("J05");//j15 FILAMENT LACK
                 TFT_SERIAL_ENTER();
             }
@@ -1103,10 +1032,10 @@ void get_command_from_TFT() {
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
               NEWFlushSerialRequestResend();
-              //NEW_SERIAL_ERROR_START;
+              NEW_SERIAL_ERROR_START;
               //     NEW_SERIAL_ERRORPGM(MSG_ERR_CHECKSUM_MISMATCH);
               //     NEW_SERIAL_ERRORLN(gcode_LastN);
-              //NEWFlushSerialRequestResend();
+              NEWFlushSerialRequestResend();
               serial3_count = 0;
               return;
             }
@@ -1228,29 +1157,31 @@ void get_command_from_TFT() {
               break;
             case 9: // a9 pasue sd
               if(card.sdprinting) {
-                TFTpausingFlag=true;
-                card.pauseSDPrint();
-                NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
-                TFT_SERIAL_ENTER();
+                enqueue_and_echo_commands_P(PSTR("M25"));
+                //TFTpausingFlag=true;
+                //card.pauseSDPrint();
+                //NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
+                //TFT_SERIAL_ENTER();
               }
               break;
             case 10:// A10 resume sd print
-              #if ENABLED(Door_ON_OFF_CHECK)
-                if(!Door_onoff_flag||(Door_onoff_flag&&(Door_onoff_status==0)))
-              #endif
               if(TFTresumingflag) {
-                card.startFileprint();
-                NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
-                TFT_SERIAL_ENTER();
+                enqueue_and_echo_commands_P(PSTR("M24"));
+                //card.startFileprint();
+                //NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
+                //TFT_SERIAL_ENTER();
               }
               break;
             case 11://A11 STOP SD PRINT
               if((card.sdprinting)||TFTresumingflag) {
-                clear_command_queue() ;
+                // clear_command_queue() ;
                 FlagResumFromOutage=0;//must clean the flag.
                 card.TFTStopPringing();
                 thermalManager.setTargetHotend(0,0); //2019.4.17
-                thermalManager.setTargetBed(0);
+                thermalManager.setTargetBed(0);                
+                enqueue_and_echo_commands_P(PSTR("G28 X Y"));
+                enqueue_and_echo_commands_P(PSTR("G90"));
+                enqueue_and_echo_commands_P(PSTR("G1 Z190"));
               }
               break;
             case 12: //a12 kill
@@ -1272,11 +1203,7 @@ void get_command_from_TFT() {
             case 14: //A14 START PRINTING
               // if((!USBConnectFlag)&&(!card.sdprinting))
 						  if(errorFlag!=0 && errorFlag!=7) break;
-
-						  #if ENABLED(Door_ON_OFF_CHECK)
-                if(!Door_onoff_flag||(Door_onoff_flag&&(Door_onoff_status==0)))
-              #endif
-              if((!planner.movesplanned())&&(!TFTresumingflag)) {
+              if(!planner.movesplanned() && !TFTresumingflag) {
                 errorFlag=0;
                 powerOFFflag=0;
                 card.startFileprint();
@@ -1287,10 +1214,7 @@ void get_command_from_TFT() {
               break;
             case 15://A15 RESUMING FROM OUTAGE
                 // if((!USBConnectFlag)&&(!card.sdprinting))
-              #if ENABLED(Door_ON_OFF_CHECK)
-                if(!Door_onoff_flag||(Door_onoff_flag&&(Door_onoff_status==0)))
-              #endif
-              if((!planner.movesplanned())&&(!TFTresumingflag)){
+              if(!planner.movesplanned() && !TFTresumingflag) {
                 if(card.cardOK)
                 FlagResumFromOutage=true;
                 (void)settings.OutageRead();
@@ -1613,20 +1537,6 @@ void get_command_from_TFT() {
               //sprintf(myi2c.I2C_SRBUF,"A100");
               //myi2c.TestMyI2C_(i2c,myi2c.addr,10,false);
               break;
-            case 50://door check on /off
-              if(TFTcode_seen('O')){Door_onoff_flag=true;break;}
-              else if(TFTcode_seen('C')){Door_onoff_flag=false;Door_onoff_status=0;door_status_older = 0;break;}
-              if(TFTcode_seen('S')) {
-                if(Door_onoff_flag) {
-                  NEW_SERIAL_PROTOCOLPGM("J39 ");
-                  TFT_SERIAL_ENTER();
-                } else {
-                  //didn't open print done and auto power off
-                  NEW_SERIAL_PROTOCOLPGM("J38 ");
-                  TFT_SERIAL_ENTER();
-                }
-              }
-              break;
             case 81:    //A81
               memset(temstr,0,50);
               sprintf(temstr, "A81V %s\r\n",longfilePrintting);
@@ -1718,16 +1628,6 @@ void TFT_Commond_Scan() {
 
 void setupSDCARD() {
   card.initsd();
-}
-
-bool pauseCMDsendflag=false;
-void pauseCMDsend() {
-static char temp=0;
-  if(commands_in_queue < BUFSIZE) {
-    temp++;
-    if(temp==1)enqueue_and_echo_commands_P(PSTR("G91"));
-    if(temp==2){enqueue_and_echo_commands_P(PSTR("G1 Z+20")); pauseCMDsendflag=false;temp=0;}
-  }
 }
 
 #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -8532,7 +8432,7 @@ inline void gcode_M17() {
 
     if (nozzle_timed_out || thermalManager.hotEnoughToExtrude(active_extruder)) {
       // Load the new filament
-      load_filament(slow_load_length, fast_load_length, purge_length, max_beep_count, true, nozzle_timed_out);
+      // load_filament(slow_load_length, fast_load_length, purge_length, max_beep_count, true, nozzle_timed_out);
     }
 
     #if ENABLED(ULTIPANEL)
@@ -8558,6 +8458,7 @@ inline void gcode_M17() {
 
     // Now all extrusion positions are resumed and ready to be confirmed
     // Set extruder to saved position
+    // TODO: check disable
     planner.set_e_position_mm((destination[E_CART] = current_position[E_CART] = resume_position[E_CART]));
 
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
@@ -8632,24 +8533,33 @@ inline void gcode_M17() {
 
     card.startFileprint();
 
+    NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
+    TFT_SERIAL_ENTER();
+    
+
     #if ENABLED(POWER_LOSS_RECOVERY)
       if (parser.seenval('T'))
         print_job_timer.resume(parser.value_long());
       else
     #endif
-        print_job_timer.start();
+        print_job_timer.start();    
   }
 
   /**
    * M25: Pause SD Print
    */
   inline void gcode_M25() {
+    TFTpausingFlag=true;
+
     card.pauseSDPrint();
     print_job_timer.pause();
 
     #if ENABLED(PARK_HEAD_ON_PAUSE)
       enqueue_and_echo_commands_P(PSTR("M125")); // Must be enqueued with pauseSDPrint set to be last in the buffer
     #endif
+
+    NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
+    TFT_SERIAL_ENTER();
   }
 
   /**
@@ -16583,8 +16493,6 @@ void setup() {
  *  - Call LCD update
  */
 void loop() {
-  if(pauseCMDsendflag) pauseCMDsend();
-
   #if ENABLED(SDSUPPORT)
 
     card.checkautostart();
@@ -16670,7 +16578,7 @@ void loop() {
         //when pause sd printing,send "ok"to tft as read buffer carry out
         planner.synchronize();
         TFTpausingFlag=false;
-        NEW_SERIAL_PROTOCOLPGM("J18");// pausing done
+        NEW_SERIAL_PROTOCOLPGM("J18"); // pausing done
         TFT_SERIAL_ENTER();
     }
   #endif

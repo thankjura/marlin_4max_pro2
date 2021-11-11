@@ -27,7 +27,6 @@
 
 
 extern char TFTresumingflag;
-extern bool pauseCMDsendflag;
 
 extern bool powerOFFflag;
 
@@ -108,7 +107,7 @@ public:
     void removeJobRecoveryFile();
   #endif
 
-  FORCE_INLINE void pauseSDPrint() { sdprinting = false; }
+  FORCE_INLINE void pauseSDPrint() {TFTresumingflag=true; sdprinting = false; }
   FORCE_INLINE bool isFileOpen() { return file.isOpen(); }
   FORCE_INLINE bool eof() { return sdpos >= filesize; }
   FORCE_INLINE int16_t get() { sdpos = file.curPosition(); return (int16_t)file.read(); }
