@@ -317,9 +317,10 @@ static bool LightConFlag=true;
 const unsigned int Max_ModelCooling=MAX_MODEL_COOLING_PRECENT_VALUE*255;
 
 
-char TFTpausingFlag=0;//for return a flag that buffer carry out
+char TFTpausingFlag=0; //for return a flag that buffer carry out
 char TFTStatusFlag=0;
 extern char TFTresumingflag;
+char TFTstoppingflag;
 char sdcardstartprintingflag=0;
 char FilamentTestFlag=true;
 //float MYfeedrate_mm_s=2000;
@@ -1158,30 +1159,20 @@ void get_command_from_TFT() {
             case 9: // a9 pasue sd
               if(card.sdprinting) {
                 enqueue_and_echo_commands_P(PSTR("M25"));
-                //TFTpausingFlag=true;
-                //card.pauseSDPrint();
-                //NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
-                //TFT_SERIAL_ENTER();
               }
               break;
             case 10:// A10 resume sd print
               if(TFTresumingflag) {
-                enqueue_and_echo_commands_P(PSTR("M24"));
-                //card.startFileprint();
-                //NEW_SERIAL_PROTOCOLPGM("J04");//j4ok printing form sd card
-                //TFT_SERIAL_ENTER();
+                enqueue_and_echo_commands_P(PSTR("M24"));                
               }
               break;
             case 11://A11 STOP SD PRINT
-              if((card.sdprinting)||TFTresumingflag) {
-                // clear_command_queue() ;
-                FlagResumFromOutage=0;//must clean the flag.
+              if(card.sdprinting||TFTresumingflag) {
+                clear_command_queue() ;
+                FlagResumFromOutage = 0; //must clean the flag.
                 card.TFTStopPringing();
-                thermalManager.setTargetHotend(0,0); //2019.4.17
-                thermalManager.setTargetBed(0);                
-                enqueue_and_echo_commands_P(PSTR("G28 X Y"));
-                enqueue_and_echo_commands_P(PSTR("G90"));
-                enqueue_and_echo_commands_P(PSTR("G1 Z190"));
+                TFTstoppingflag=true;
+                thermalManager.disable_all_heaters();
               }
               break;
             case 12: //a12 kill
@@ -1516,8 +1507,13 @@ void get_command_from_TFT() {
               softwareReset();
               break;
             case 41://a41
-              if(TFTcode_seen('O')){PrintdoneAndPowerOFF=true;break;}
-              else if(TFTcode_seen('C')){PrintdoneAndPowerOFF=false;break;}
+              if(TFTcode_seen('O')) {
+                PrintdoneAndPowerOFF=true;
+                break;
+              } else if(TFTcode_seen('C')) {
+                PrintdoneAndPowerOFF=false;
+                break;
+              }
               if(TFTcode_seen('S')) {
                 if(PrintdoneAndPowerOFF) {
                   NEW_SERIAL_PROTOCOLPGM("J35 ");
@@ -8459,7 +8455,7 @@ inline void gcode_M17() {
     // Now all extrusion positions are resumed and ready to be confirmed
     // Set extruder to saved position
     // TODO: check disable
-    planner.set_e_position_mm((destination[E_CART] = current_position[E_CART] = resume_position[E_CART]));
+    //planner.set_e_position_mm((destination[E_CART] = current_position[E_CART] = resume_position[E_CART]));
 
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
       runout.reset();
@@ -8557,7 +8553,6 @@ inline void gcode_M17() {
     #if ENABLED(PARK_HEAD_ON_PAUSE)
       enqueue_and_echo_commands_P(PSTR("M125")); // Must be enqueued with pauseSDPrint set to be last in the buffer
     #endif
-
     NEW_SERIAL_PROTOCOLPGM("J05");//j05 pausing
     TFT_SERIAL_ENTER();
   }
@@ -16577,9 +16572,16 @@ void loop() {
     if(TFTpausingFlag) {
         //when pause sd printing,send "ok"to tft as read buffer carry out
         planner.synchronize();
-        TFTpausingFlag=false;
+        TFTpausingFlag=false;        
         NEW_SERIAL_PROTOCOLPGM("J18"); // pausing done
         TFT_SERIAL_ENTER();
+    } 
+    if (TFTstoppingflag) {
+      TFTstoppingflag = false;
+      enqueue_and_echo_commands_P(PSTR("G90"));
+      enqueue_and_echo_commands_P(PSTR("G1 E-1 F260"));
+      enqueue_and_echo_commands_P(PSTR("G1 Z190 F300"));
+      enqueue_and_echo_commands_P(PSTR("G28 X Y"));
     }
   #endif
 }

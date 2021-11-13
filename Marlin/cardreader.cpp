@@ -384,8 +384,10 @@ void CardReader::TFTStopPringing() {
   sdprinting = false;
   TFTresumingflag=false;
   sdcardstartprintingflag=false;
+  
   closefile();
-  // quickstop_stepper();
+  //print_job_timer.stop();
+  quickstop_stepper();
   NEW_SERIAL_PROTOCOLPGM("J16");//STOP
   TFT_SERIAL_ENTER();
   //  autotempShutdown();

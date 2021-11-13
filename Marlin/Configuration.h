@@ -39,7 +39,7 @@
 #define CONFIGURATION_H
 #define CONFIGURATION_H_VERSION 010109
 
-#define MSG_MY_VERSION "V1.5.2" //2021.11.11
+#define MSG_MY_VERSION "V1.5.4" //2021.11.13
 #define OutageTest  // Resuming printing
 #define TFTmodel
 
@@ -387,6 +387,10 @@
   #define  DEFAULT_Kp   20.96
   #define  DEFAULT_Ki   0.4
   #define  DEFAULT_Kd   65.49
+  // 4maxp2
+  //  #define DEFAULT_Kp 17.13
+  //  #define DEFAULT_Ki 0.93
+  //  #define DEFAULT_Kd 78.58
 
   // MakerGear
   //#define DEFAULT_Kp 7.0
@@ -565,6 +569,11 @@
 //#define E2_DRIVER_TYPE A4988
 //#define E3_DRIVER_TYPE A4988
 //#define E4_DRIVER_TYPE A4988
+
+#define X_DRIVER_TYPE  TMC2208_STANDALONE
+#define Y_DRIVER_TYPE  TMC2208_STANDALONE
+#define Z_DRIVER_TYPE  A4988
+#define E0_DRIVER_TYPE A4988
 
 // Enable this feature if all enabled endstop pins are interrupt-capable.
 // This will remove the need to poll the interrupt pins, saving many CPU cycles.
